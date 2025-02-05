@@ -10,6 +10,7 @@
 
 #include <errno.h>
 
+QO_PURE
 qo_stat_t
 __qo_dstream_opening_error()
 {
@@ -21,7 +22,7 @@ __qo_dstream_opening_error()
         case EPERM:
         case EACCES:        return QO_PERMISSION_DENIED;
         case EEXIST:        return QO_ALREADY_EXISTS;
-        case EMFILE:        return QO_NO_RESOURCE;
+        case EMFILE:        return QO_NO_RESOURCES;
         case EBUSY:         return QO_TARGET_BUSY;
         case ENAMETOOLONG:  return QO_TOO_LONG;
         case ENOMEM:        return QO_OUT_OF_MEMORY;
@@ -32,7 +33,7 @@ __qo_dstream_opening_error()
     }
 }
 
-QO_NO_INLINE
+QO_PURE
 qo_stat_t
 __qo_dstream_allocating_error()
 {
@@ -53,7 +54,7 @@ __qo_dstream_allocating_error()
     }
 }
 
-QO_NO_INLINE
+QO_PURE
 qo_stat_t
 __qo_dstream_reading_error()
 {
@@ -71,7 +72,7 @@ __qo_dstream_reading_error()
     }
 }
 
-QO_NO_INLINE
+QO_PURE
 qo_stat_t
 __qo_dstream_writing_error()
 {
@@ -93,6 +94,7 @@ __qo_dstream_writing_error()
     }
 }
 
+QO_NO_SIDE_EFFECTS
 qo_stat_t
 __qo_dstream_seeking_error(
     qo_offset_t returned_offset
@@ -106,6 +108,7 @@ __qo_dstream_seeking_error(
     }
 }
 
+QO_PURE
 qo_stat_t
 __qo_dstream_size_getting_error()
 {

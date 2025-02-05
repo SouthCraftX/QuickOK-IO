@@ -13,15 +13,10 @@
 
 #define __QO_SINGAL_IO_CALL_LIMIT (1024 * 1024 * 1024)
 
-#define __QO_ACCESS_MODE_PACK(x) (x >> 24)
-#define __QO_FLAGS_PACK(x) (x >> 24)
-
-#define __QO_ACCESS_MODE_UNPACK(x) (x << 24)
-#define __QO_FLAGS_UNPACK(x) (x << 24)
 
 // `>>24` to make them sustainable for qo_flag8_t.
-#define QO_FILE_READ           __QO_ACCESS_MODE_PACK(GENERIC_READ)
-#define QO_FILE_WRITE          __QO_ACCESS_MODE_PACK(GENERIC_WRITE)
+#define QO_FILE_READ           GENERIC_READ
+#define QO_FILE_WRITE          GENERIC_WRITE
 #define QO_FILE_READ_WRITE     (QO_FILE_READ | QO_FILE_WRITE)
 
 #define QO_FILE_TRUNCATE_EXISTING  TRUNCATE_EXISTING
@@ -29,19 +24,24 @@
 #define QO_FILE_CLEAN_OPEN         CREATE_ALWAYS  
 
 // `>>24` to make them sustainable for qo_flag16_t.
-#define QO_FILE_SEQUENTIAL      __QO_FLAGS_PACK(FILE_FLAG_SEQUENTIAL_SCAN)
-#define QO_FILE_RAMDOM_ACCESS   __QO_FLAGS_PACK(FILE_FLAG_RANDOM_ACCESS)
-#define QO_FILE_NO_CACHING      __QO_FLAGS_PACK(FILE_FLAG_NO_BUFFERING)
-#define QO_FILE_DELETE_ON_CLOSE __QO_FLAGS_PACK(FILE_FLAG_DELETE_ON_CLOSE)
+#define QO_FILE_SEQUENTIAL      FILE_FLAG_SEQUENTIAL_SCAN
+#define QO_FILE_RAMDOM_ACCESS   FILE_FLAG_RANDOM_ACCESS
+#define QO_FILE_NO_CACHING      FILE_FLAG_NO_BUFFERING
+#define QO_FILE_DELETE_ON_CLOSE FILE_FLAG_DELETE_ON_CLOSE
 
 // Not 32767, to reserve some space for API consumption.
 #define __QO_IS_PATH_LEN_UNRESONABLE(path_size) (path_size > 32760)
+
+struct _QO_DirectStream
+{
+    HANDLE handle;
+};
 
 qo_stat_t
 __qo_handle_transcoding_failure()
 {
 #if QO_DEBUG
-    QO_ERRPRINTF("qo_sysfile_open: MultiByteToWideChar failed: ");
+    QO_ERRPRINTF("qo_dstream_open: MultiByteToWideChar failed: ");
 
     switch (GetLastError())
     {
@@ -65,7 +65,7 @@ __qo_handle_transcoding_failure()
 
 QO_PURE
 qo_stat_t
-__qo_sysfile_opening_error()
+__qo_dstream_opening_error()
 {
     switch(GetLastError())
     {
@@ -81,7 +81,7 @@ __qo_sysfile_opening_error()
 
 QO_PURE
 qo_stat_t
-__qo_sysfile_reading_error()
+__qo_dstream_reading_error()
 {
     switch (GetLastError())
     {
@@ -130,7 +130,7 @@ __qo_WriteFile64(
         *lpNumberOfBytesWritten += singly_written;
 
         if (lpOverlapped)
-            overlapped.Pointer += chuck_size;
+            overlapped.Pointer = (LPVOID)((qo_byte_t *)overlapped.Pointer + chuck_size);
 
     } 
     while(dwNumberOfBytesToWrite);
@@ -141,11 +141,11 @@ __qo_WriteFile64(
 // Extension of Windows's `ReadFile`.  It supports reading more than 4GB.
 BOOL
 __qo_ReadFile64(
-    HANDLE hFile ,
-    LPVOID lpBuffer ,
-    ULONG64 dwNumberOfBytesToRead ,
-    PULONG64 lpNumberOfBytesRead ,
-    LPOVERLAPPED lpOverlapped
+    HANDLE          hFile ,
+    LPVOID          lpBuffer ,
+    ULONG64         dwNumberOfBytesToRead ,
+    PULONG64        lpNumberOfBytesRead ,
+    LPOVERLAPPED    lpOverlapped
 ){
     BOOL ret = TRUE;
     DWORD chuck_size , singly_read;
@@ -182,38 +182,28 @@ __qo_ReadFile64(
     return ret;
 }
 
-#   if QO_SYSTEM_BIT(64)
-qo_size_t qo_sysfile_read64(
-    QO_DirectStream *    file ,
-    qo_byte_t * buf ,
-    qo_ssize_t  size
-){
-    //
-}
-#   endif
-
 qo_size_t 
-QO_IMPL(qo_sysfile_read_explicit)(
-    QO_DirectStream *  file ,
-    qo_byte_t *         buffer  ,
+QO_IMPL(qo_dstream_read_explicit)(
+    QO_DirectStream *   file ,
+    qo_byte_t *         bufferfer  ,
     qo_size_t           size ,
     qo_stat_t *         p_stat
 ) {
     qo_size_t read_size = 0;
-    qo_bool_t success = qo_false;
+    BOOL success = FALSE;
 #if QO_SYSTEM_BIT(64)
     if (size > QO_UINT32_MAX) {
-        success = __qo_ReadFile64((HANDLE)file, buffer, size, &read_size, NULL);
+        success = __qo_ReadFile64(file->handle, bufferfer, size, &read_size, NULL);
     } else {
-        success = ReadFile((HANDLE)file, buffer, size, (DWORD *)&read_size, NULL);
+        success = ReadFile(file->handle, bufferfer, size, (DWORD *)&read_size, NULL);
     }
 #else
-    success = ReadFile((HANDLE)file, buffer, size, (DWORD *)&read_size, NULL);
+    success = ReadFile((HANDLE)file, bufferfer, size, (DWORD *)&read_size, NULL);
 #endif
 
     if (!success) {
         if (p_stat) 
-            *p_stat = __qo_sysfile_reading_error();
+            *p_stat = __qo_dstream_reading_error();
         return read_size;
     }
 
@@ -226,9 +216,9 @@ QO_IMPL(qo_sysfile_read_explicit)(
 
 
 qo_size_t
-QO_IMPL(qo_sysfile_write_explicit)(
+QO_IMPL(qo_dstream_write_explicit)(
     QO_DirectStream *   file ,
-    const qo_byte_t *   buffer ,
+    const qo_byte_t *   bufferfer ,
     qo_size_t           size ,
     qo_stat_t *         p_stat
 ){
@@ -236,17 +226,17 @@ QO_IMPL(qo_sysfile_write_explicit)(
     qo_bool_t success = qo_false;
 #if QO_SYSTEM_BIT(64)
     if (size > QO_UINT32_MAX) {
-        success = __qo_WriteFile64((HANDLE)file, buffer, size, &written_size, NULL);
+        success = __qo_WriteFile64((HANDLE)file, bufferfer, size, &written_size, NULL);
     } else {
-        success = WriteFile((HANDLE)file, buffer, size, (DWORD *)&written_size, NULL);
+        success = WriteFile((HANDLE)file, bufferfer, size, (DWORD *)&written_size, NULL);
     }
 #else
-    success = WriteFile((HANDLE)file, buffer, size, (DWORD *)&read_size, NULL);
+    success = WriteFile((HANDLE)file, bufferfer, size, (DWORD *)&read_size, NULL);
 #endif
 
     if (!success) {
         if (p_stat) 
-            *p_stat = __qo_sysfile_writing_error();
+            *p_stat = __qo_dstream_writing_error();
         return written_size;
     }
 
@@ -257,9 +247,9 @@ QO_IMPL(qo_sysfile_write_explicit)(
 }
 
 qo_size_t 
-QO_IMPL(qo_sysfile_read_at_explicit)(
+QO_IMPL(qo_dstream_read_at_explicit)(
     QO_DirectStream *  file ,
-    qo_byte_t *         buffer ,
+    qo_byte_t *         bufferfer ,
     qo_size_t           size ,
     qo_offset_t         offset ,
     qo_stat_t *         p_stat
@@ -278,17 +268,17 @@ QO_IMPL(qo_sysfile_read_at_explicit)(
 
 #if QO_SYSTEM_BIT(64)
     if (size > QO_UINT32_MAX) {
-        success = __qo_ReadFile64((HANDLE)file, buffer, size, &read_size, NULL);
+        success = __qo_ReadFile64((HANDLE)file, bufferfer, size, &read_size, NULL);
     } else {
-        success = ReadFile((HANDLE)file, buffer, size, (DWORD *)&read_size, &overlapped);
+        success = ReadFile((HANDLE)file, bufferfer, size, (DWORD *)&read_size, &overlapped);
     }
 #else
-    read_success = ReadFile((HANDLE)file, buffer, size, (DWORD *)&read_size, &overlapped);
+    read_success = ReadFile((HANDLE)file, bufferfer, size, (DWORD *)&read_size, &overlapped);
 #endif
 
     if (!success) {
         if (p_stat) 
-            *p_stat = __qo_sysfile_reading_error();
+            *p_stat = __qo_dstream_reading_error();
         return read_size;
     }
 
@@ -299,9 +289,9 @@ QO_IMPL(qo_sysfile_read_at_explicit)(
 }
 
 qo_size_t 
-QO_IMPL(qo_sysfile_write_at_explicit)(
+QO_IMPL(qo_dstream_write_at_explicit)(
     QO_DirectStream *  file ,
-    qo_byte_t *         buffer ,
+    qo_byte_t *         bufferfer ,
     qo_size_t           size ,
     qo_offset_t         offset ,
     qo_stat_t *         p_stat
@@ -320,17 +310,17 @@ QO_IMPL(qo_sysfile_write_at_explicit)(
 
 #if QO_SYSTEM_BIT(64)
     if (size > QO_UINT32_MAX) {
-        success = __qo_WriteFile64((HANDLE)file, buffer, size, &written_size, NULL);
+        success = __qo_WriteFile64((HANDLE)file, bufferfer, size, &written_size, NULL);
     } else {
-        success = WriteFile((HANDLE)file, buffer, size, (DWORD *)&written_size, &overlapped);
+        success = WriteFile((HANDLE)file, bufferfer, size, (DWORD *)&written_size, &overlapped);
     }
 #else
-    read_success = WriteFile((HANDLE)file, buffer, size, (DWORD *)&read_size, &overlapped);
+    read_success = WriteFile((HANDLE)file, bufferfer, size, (DWORD *)&read_size, &overlapped);
 #endif
 
     if (!success) {
         if (p_stat) 
-            *p_stat = __qo_sysfile_writing_error();
+            *p_stat = __qo_dstream_writing_error();
         return written_size;
     }
 
@@ -342,8 +332,8 @@ QO_IMPL(qo_sysfile_write_at_explicit)(
 
 
 qo_stat_t 
-QO_IMPL(qo_sysfile_open)(
-    QO_DirectStream ** pp_file , 
+QO_IMPL(qo_dstream_open)(
+    QO_DirectStream *   p_file , 
     qo_ccstring_t       path , 
     qo_size_t           path_size ,
     qo_flag32_t         access_mode ,
@@ -387,14 +377,14 @@ QO_IMPL(qo_sysfile_open)(
 
     if (file_handle == INVALID_HANDLE_VALUE)
     {
-        return __qo_sysfile_opening_error();
+        return __qo_dstream_opening_error();
     }
     *pp_file = (QO_DirectStream *)file_handle;
     return QO_OK;
 }
 
 QO_FORCE_INLINE
-void qo_sysfile_close(
+void qo_dstream_close(
     QO_DirectStream * p_file
 ){
     if (file)
@@ -402,7 +392,7 @@ void qo_sysfile_close(
 }
 
 QO_API 
-qo_stat_t qo_sysfile_get_size(
+qo_stat_t qo_dstream_get_size(
     QO_DirectStream * p_file ,
     qo_size_t * p_size
 ){
@@ -439,7 +429,7 @@ qo_offset_t qo_win_large_interger_to_offset(
 }
 
 QO_API
-qo_offset_t qo_sysfile_seek(
+qo_offset_t qo_dstream_seek(
     QO_DirectStream * file ,
     qo_offset_t offset ,
     qo_flag32_t move_method

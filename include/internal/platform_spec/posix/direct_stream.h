@@ -272,16 +272,7 @@ qo_dstream_alloc(
 }
 #endif
 
-// QO_FORCE_INLINE
-// qo_stat_t 
-// qo_fstream_prealloc(
-//     QO_DirectStream *    stream , 
-//     qo_size_t   size
-// ){
-//     return fallocate(stream->fd , 0 , 0 , size) ? 
-//            __qo_dstream_allocating_error() : QO_OK;
-           
-// }
+
 
 // TODO: clean those code for windows.
 #if 0

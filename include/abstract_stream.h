@@ -1,9 +1,14 @@
 #pragma once
-#include "stream_base.h"
 #define __QO_ABSTRACT_STREAM_H__
+
+#include "stream_base.h"
 
 #include "direct_stream.h"
 #include "memory_stream.h"
+
+#if !defined(QO_NO_STDIO)
+#include <stdio.h>
+#endif // !QO_NO_STDIO
 
 #if defined(__cplusplus)
 extern "C" {
@@ -13,15 +18,23 @@ struct _QO_AbstractStream;
 typedef struct _QO_AbstractStream QO_AbstractStream;
 
 qo_stat_t
-qo_abstream_from_dstream(
+qo_dstream_abstract(
     QO_AbstractStream * p_abstream ,
     QO_DirectStream *   p_dstream
 ) QO_NONNULL(1);
 
 qo_stat_t
-qo_abstream_from_memstream(
+qo_memstream_abstract(
     QO_MemoryStream *   p_memstream
 ) QO_NONNULL(1);
+
+#if !defined(QO_NO_STDIO)
+qo_stat_t
+qo_stdio_abstract(
+    QO_AbstractStream * p_abstream ,
+    FILE *              p_file
+) QO_NONNULL(1 , 2);
+#endif // !QO_NO_STDIO
 
 void
 qo_abstream_close(
@@ -92,7 +105,7 @@ qo_offset_t
 qo_abstream_seek(
     QO_AbstractStream *             p_abstream ,
     qo_offset_t                     offset ,
-    enum QO_FilePointerMoveMethod   move_method ,
+    QO_FilePointerMoveMethod   move_method ,
     qo_offset_t *                   p_stat
 ) QO_NONNULL(1);
 

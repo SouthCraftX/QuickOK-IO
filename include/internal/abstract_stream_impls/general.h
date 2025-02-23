@@ -95,7 +95,7 @@ typedef struct
     (* seek)(
         QO_AbstractStream *             self ,
         qo_offset_t                     offset ,
-        enum QO_FilePointerMoveMethod   move_method ,
+        QO_FilePointerMoveMethod   move_method ,
         qo_stat_t *                     p_stat
     ) QO_NONNULL(1);
 
@@ -213,7 +213,7 @@ qo_offset_t
 qo_abstream_seek(
     QO_AbstractStream *             self ,
     qo_offset_t                     offset ,
-    enum QO_FilePointerMoveMethod   move_method ,
+    QO_FilePointerMoveMethod   move_method ,
     qo_stat_t *                     p_stat
 ) {
     return self->__methods->seek(self , offset , move_method , p_stat);

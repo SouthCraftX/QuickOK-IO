@@ -236,7 +236,7 @@ qo_offset_t
 qo_dstream_seek(
     QO_DirectStream *               stream ,
     qo_offset_t                     desired_offset ,
-    enum QO_FilePointerMoveMethod   move_method ,
+    QO_FilePointerMoveMethod   move_method ,
     qo_stat_t *                     p_stat
 ){
     off_t off = lseek(stream->fd , desired_offset , move_method);

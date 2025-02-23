@@ -42,6 +42,34 @@ __refuse_read_at(
 
 QO_GLOBAL_UNIQUE
 qo_size_t
+__unsupported_read_at(
+    QO_AbstractStream * p_stream ,
+    qo_offset_t         offset ,
+    qo_pointer_t        buffer ,
+    qo_size_t           size ,
+    qo_stat_t *         p_stat
+) {
+    if (p_stat) 
+        *p_stat = QO_NOT_SUPPORTED;
+    return 0;
+}
+
+QO_GLOBAL_UNIQUE
+qo_size_t
+__unsupported_remote_read_at(
+    QO_AbstractStream * p_stream ,
+    qo_pointer_t *      p_buffer ,
+    qo_size_t           size ,
+    qo_offset_t         offset ,
+    qo_stat_t *         p_stat
+) {
+    if (p_stat) 
+        *p_stat = QO_NOT_SUPPORTED;
+    return 0;
+}
+
+QO_GLOBAL_UNIQUE
+qo_size_t
 __refuse_write_at(
     QO_AbstractStream * p_stream ,
     qo_offset_t         offset ,

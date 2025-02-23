@@ -123,7 +123,7 @@ qo_offset_t
 __abstream_memstream_seek(
     QO_AbstractStream *             p_abstream ,
     qo_offset_t                     offset ,
-    enum QO_FilePointerMoveMethod   move_method ,
+    QO_FilePointerMoveMethod        move_method ,
     qo_stat_t *                     p_stat
 ) {
     QO_MemoryStream * p_memstream = (QO_MemoryStream *)p_abstream->__control_block[0];
